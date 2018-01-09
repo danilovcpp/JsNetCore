@@ -24,13 +24,19 @@ namespace JsNetCore.Controllers
 			
 			_engine.SetValue("exec", new Func<string, string>(_context.Exec));
 			
-			_engine.Execute(@"var result = exec('Hello World');");
-			var result = _engine.GetValue("result");
-			
+			var parameters = String.Empty;
 			foreach (var param in HttpContext.Request.Query)
 			{
-				Console.WriteLine(param);
+				parameters += $"{param.Value},";
 			}
+			
+			if(parameters.EndsWith(","))
+			{
+				parameters = parameters.Remove(parameters.Length - 1);
+			}
+
+			_engine.Execute($"var result = {script}({parameters});");
+			var result = _engine.GetValue("result");
 
 			return result.ToString();
 		}
