@@ -1,3 +1,6 @@
 ﻿function runSql(query) {
-	return exec(query);
+
+	var customers = JSON.parse(exec(query));
+
+	return customers;
 }

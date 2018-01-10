@@ -6,6 +6,8 @@ using Jint;
 using JsNetCore.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace JsNetCore.Controllers
 {
@@ -18,12 +20,12 @@ namespace JsNetCore.Controllers
 		
 		// GET: api/business/method1?a=1&b=2
 		[HttpGet("{method}", Name = "Get")]
-		public string Get(string method)
+		public object Get(string method)
 		{
 			var script = System.IO.File.ReadAllText($"Scripts/{method}.js");
 			
 			_engine.SetValue("exec", new Func<string, string>(_context.Exec));
-			
+
 			var parameters = String.Empty;
 			foreach (var param in HttpContext.Request.Query)
 			{
@@ -38,7 +40,7 @@ namespace JsNetCore.Controllers
 			_engine.Execute($"var result = {script}({parameters});");
 			var result = _engine.GetValue("result");
 
-			return result.ToString();
+			return result.ToObject();
 		}
 	}
 }
