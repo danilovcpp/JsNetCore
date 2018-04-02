@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.IO;
 using System.Text;
+using System.Diagnostics;
 
 namespace JsNetCore.Models
 {
@@ -87,104 +88,84 @@ namespace JsNetCore.Models
             return JsonConvert.SerializeObject(list);
         }
 
-        public string ExecSqlQuery(string query)
+        /// <summary>
+        /// Поиск строки в таблице по id
+        /// </summary>
+        /// <param name="name">Название таблицы</param>
+        /// <param name="id"> UUID по которому получаем значения строки в таблице</param>
+        /// <returns>Результат выборки из таблицы в строковом виде в формате json</returns>
+        public string FindById(string name, string id)
         {
-            //TODO: брать путь из бд
-            return @"D:\Work\TestFile.txt";
+            var obj = new JObject();
+
+            using (var npgSqlConnection = new NpgsqlConnection(connectionString))
+            {
+                var npgSqlCommand = new NpgsqlCommand($"SELECT * FROM {name} WHERE \"recId\" = '{id}'");
+
+                try
+                {
+                    npgSqlConnection.Open();
+                    npgSqlCommand.Connection = npgSqlConnection;
+
+                    NpgsqlDataReader reader = npgSqlCommand.ExecuteReader();
+
+                    if (reader.Read())
+                    {
+                        for (int i = 0; i < reader.FieldCount; i++)
+                        {
+                            obj.Add(reader.GetName(i), reader.GetValue(i).ToString());
+                        }
+                    }
+                }
+                catch(Exception ex)
+                {
+                    Debug.Print(ex.Message);
+                    return string.Empty;
+                }
+            }
+
+            return obj.Count > 0 ? JsonConvert.SerializeObject(obj) : string.Empty;
         }
 
         /// <summary>
-        /// Метод получения содержимого файла в виде байт массива
+        /// Метод добавления в таблицу значения по uuid
         /// </summary>
-        /// <param name="path">Путь к файлу</param>
-        /// <returns>Массив байт</returns>
-        public byte[] LoadFile(string path)
+        /// <param name="tableName">Имя таблицы</param>
+        /// <param name="recName">Имя поля</param>  //TODO: разобраться с количеством полей для разных моделей
+        /// <param name="recId">UUID</param>
+        /// <returns>Результат выполнения метода: true, false</returns>
+        public bool Save(string tableName, object parameters)
         {
-            string textFromFile = string.Empty;
-            byte[] array;
+            var par = JObject.FromObject(parameters);
+            Dictionary<string, string> param = new Dictionary<string, string>();
 
-            if (!File.Exists(path))
-                return null;
+            foreach (var x in par)
+                param.Add($"\"{x.Key}\"", $"'{x.Value.ToString()}'");
+            
+            string cmdParams = String.Join(',', param.Keys);
+            string cmdArgs = String.Join(',', param.Values);
 
-            using (FileStream fstream = File.OpenRead(path))
-            {
-                // преобразуем строку в байты
-                array = new byte[fstream.Length];
-
-                // считываем данные
-                fstream.Read(array, 0, array.Length);
-
-                // декодируем байты в строку
-                textFromFile = Encoding.Default.GetString(array);
-            }
-
-            return array;
-        }
-
-
-        public string GetById(string id)
-        {
-            /*
-            var obj = new JObject();
+            if (FindById(tableName, param["\"recId\""]) != "")
+                return false;
 
             using (var npgSqlConnection = new NpgsqlConnection(connectionString))
             {
-                var npgSqlCommand = new NpgsqlCommand();
-                npgSqlCommand.CommandText = $"SELECT \"recId\", \"recName\", \"artist\" WHERE \"recId\" = 'b9d27749-2f0f-4bca-aa3a-c0685e6235d9'";
-                npgSqlConnection.Open();
-                npgSqlCommand.Connection = npgSqlConnection;
+                var npgSqlCommand = new NpgsqlCommand($"INSERT INTO {tableName}({cmdParams}) VALUES({cmdArgs})");
 
-                NpgsqlDataReader reader = npgSqlCommand.ExecuteReader();
-                if (reader.Read())
+                try
                 {
-                    obj.Add("recId", (JObject)reader[0]);
-                    obj.Add("recName", (JObject)reader[1]);
-                    obj.Add("artist", (JObject)reader[2]);
+                    npgSqlConnection.Open();
+                    npgSqlCommand.Connection = npgSqlConnection;
+                    npgSqlCommand.ExecuteNonQuery();
                 }
-            }*/
-
-
-            //TODO: изменить на получение значения из БД по uuid
-            var obj = new JObject();
-
-            obj.Add("recId", Guid.NewGuid().ToString());
-            obj.Add("recName", $"Track №1");
-            obj.Add("artist", $"Artist №1");
-
-            return JsonConvert.SerializeObject(obj);
-        }
-
-        public void Insert(object @object)
-        {
-            //TODO: уйти от хард кода в запросе и параметрах
-            using (var npgSqlConnection = new NpgsqlConnection(connectionString))
-            {
-                var npgSqlCommand = new NpgsqlCommand();
-                npgSqlCommand.CommandText = $"INSERT INTO tracks(recId, \"recName\", artist) VALUES(@guid, @trackName, @artist)";
-
-                npgSqlCommand.Parameters.AddWithValue("@guid", Guid.NewGuid());
-                npgSqlCommand.Parameters.AddWithValue("@trackName", "Track1");
-                npgSqlCommand.Parameters.AddWithValue("@artist", "Atrist1");
-                npgSqlConnection.Open();
-                npgSqlCommand.Connection = npgSqlConnection;
-                npgSqlCommand.ExecuteNonQuery();
+                catch (Exception ex)
+                {
+                    Debug.Print(ex.Message);
+                    return false;
+                }
             }
-        }
 
-        public void Update(string id, object @object)
-        {
-            string name = "Template";
-            string artist = "ArtistTemplate";
-
-            //TODO: аналогично insert методу
-            using (var npgSqlConnection = new NpgsqlConnection(connectionString))
-            {
-                var npgSqlCommand = new NpgsqlCommand();
-                npgSqlCommand.CommandText = $"UPDATE tracks SET recName = {name}, artist = {artist} WHERE recId = {id};";
-                npgSqlConnection.Open();
-                npgSqlCommand.Connection = npgSqlConnection;
-                npgSqlCommand.ExecuteNonQuery();
-            }
+            return true;
         }
     }
 }
