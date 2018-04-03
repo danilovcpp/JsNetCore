@@ -2,7 +2,7 @@
     if (params.recId == null)
         return false;
 
-    return Save("tracks", params);
+    return Insert("tracks", params);
 }
 
 function findtrackbyid(params) {

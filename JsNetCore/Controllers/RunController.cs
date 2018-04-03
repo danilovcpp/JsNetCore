@@ -33,7 +33,7 @@ namespace JsNetCore.Controllers
             var script = System.IO.File.ReadAllText(fileName);
 
             _engine.SetValue("FindById", new Func<string, string, string>(_context.FindById));
-            _engine.SetValue("Save", new Func<string, object, bool>(_context.Save));
+            _engine.SetValue("Insert", new Func<string, object, bool>(_context.Insert));
 
             _engine.Execute(script);
             _engine.Execute($"var result = {request.Method}({request.Params});");

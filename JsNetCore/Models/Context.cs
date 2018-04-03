@@ -128,13 +128,12 @@ namespace JsNetCore.Models
         }
 
         /// <summary>
-        /// Метод добавления в таблицу значения по uuid
+        /// Метод добавления строки в таблицу
         /// </summary>
-        /// <param name="tableName">Имя таблицы</param>
-        /// <param name="recName">Имя поля</param>  //TODO: разобраться с количеством полей для разных моделей
-        /// <param name="recId">UUID</param>
-        /// <returns>Результат выполнения метода: true, false</returns>
-        public bool Save(string tableName, object parameters)
+        /// <param name="tableName">Название таблицы</param>
+        /// <param name="parameters">Набор полей таблицы</param>
+        /// <returns></returns>
+        public bool Insert(string tableName, object parameters)
         {
             var par = JObject.FromObject(parameters);
             Dictionary<string, string> param = new Dictionary<string, string>();

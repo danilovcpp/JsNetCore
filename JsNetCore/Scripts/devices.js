@@ -2,7 +2,7 @@
     if (params.recId == null || params.recName == null) 
         return false;
 
-    return Save("devices", params);
+    return Insert("devices", params);
 }
 
 function finddevicebyid(params) {
