@@ -25,18 +25,19 @@ namespace JsNetCore.Controllers
         [HttpPost(Name = "Run")]
         public IActionResult Run([FromBody] RunRequest request)
         {
-            string fileName = $"Scripts/{request.TableName}.js";
+            string fileName = $"Scripts/scripts.js";
 
             if (!System.IO.File.Exists(fileName))
                 return NotFound();
 
             var script = System.IO.File.ReadAllText(fileName);
 
+            _engine.SetValue("ExecSqlProcedure", new Func<string, string, object, string>(_context.ExecSqlProcedure));
             _engine.SetValue("FindById", new Func<string, string, string>(_context.FindById));
             _engine.SetValue("Insert", new Func<string, object, bool>(_context.Insert));
 
             _engine.Execute(script);
-            _engine.Execute($"var result = {request.Method}({request.Params});");
+            _engine.Execute($"var result = {request.TableName.ToLower()}.{request.Method.ToLower()}({request.Params});");
 
             return Ok(_engine.GetValue("result").ToString());
         }

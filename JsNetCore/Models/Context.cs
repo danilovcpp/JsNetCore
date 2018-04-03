@@ -88,19 +88,39 @@ namespace JsNetCore.Models
             return JsonConvert.SerializeObject(list);
         }
 
+        #region Запуск SQL процедур
+        /// <summary>
+        /// Метод запускающий на выполнение SQL процедуры
+        /// </summary>
+        /// <param name="procedure">Название SQL процедуры</param>
+        /// <param name="tableName">Название таблицы</param>
+        /// <param name="param">Параметры необходимые для определенной SQL процедуры</param>
+        /// <returns></returns>
+        public string ExecSqlProcedure(string procedure, string tableName, object param)
+        {
+            if (procedure.ToLower() == "insert")
+                return Insert(tableName, param) ? "true" : "false";
+            else if (procedure.ToLower() == "findbyid")
+                return FindById(tableName, param.ToString());
+
+            return string.Empty;
+        } 
+        #endregion
+
+        #region Поиск в таблице по UUID
         /// <summary>
         /// Поиск строки в таблице по id
         /// </summary>
-        /// <param name="name">Название таблицы</param>
+        /// <param name="tableName">Название таблицы</param>
         /// <param name="id"> UUID по которому получаем значения строки в таблице</param>
         /// <returns>Результат выборки из таблицы в строковом виде в формате json</returns>
-        public string FindById(string name, string id)
+        public string FindById(string tableName, string id)
         {
             var obj = new JObject();
 
             using (var npgSqlConnection = new NpgsqlConnection(connectionString))
             {
-                var npgSqlCommand = new NpgsqlCommand($"SELECT * FROM {name} WHERE \"recId\" = '{id}'");
+                var npgSqlCommand = new NpgsqlCommand($"SELECT * FROM {tableName} WHERE \"recId\" = '{id}'");
 
                 try
                 {
@@ -117,7 +137,7 @@ namespace JsNetCore.Models
                         }
                     }
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     Debug.Print(ex.Message);
                     return string.Empty;
@@ -126,7 +146,9 @@ namespace JsNetCore.Models
 
             return obj.Count > 0 ? JsonConvert.SerializeObject(obj) : string.Empty;
         }
+        #endregion
 
+        #region Добавление строки в таблицу
         /// <summary>
         /// Метод добавления строки в таблицу
         /// </summary>
@@ -140,7 +162,7 @@ namespace JsNetCore.Models
 
             foreach (var x in par)
                 param.Add($"\"{x.Key}\"", $"'{x.Value.ToString()}'");
-            
+
             string cmdParams = String.Join(',', param.Keys);
             string cmdArgs = String.Join(',', param.Values);
 
@@ -165,6 +187,7 @@ namespace JsNetCore.Models
             }
 
             return true;
-        }
+        } 
+        #endregion
     }
 }
