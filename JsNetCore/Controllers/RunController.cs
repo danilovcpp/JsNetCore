@@ -7,6 +7,7 @@ using Jint;
 using JsNetCore.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 
 namespace JsNetCore.Controllers
 {
@@ -16,6 +17,18 @@ namespace JsNetCore.Controllers
     {
         private readonly Engine _engine = new Engine();
         private readonly Context _context = new Context();
+        
+
+        public RunController()
+        {
+            var script = System.IO.File.ReadAllText($"Scripts/scripts.js");
+
+            _engine.SetValue("FindById", new Func<string, string, string>(_context.FindById));
+            _engine.SetValue("Insert", new Func<string, object, bool>(_context.Insert));
+            _engine.SetValue("ExecSqlProcedure", new Func<string, object, object>(_context.ExecSqlProcedure));
+
+            _engine.Execute(script);
+        }
 
         /// <summary>
         /// Метод запускающий на выполнение js функцию
@@ -25,20 +38,7 @@ namespace JsNetCore.Controllers
         [HttpPost(Name = "Run")]
         public IActionResult Run([FromBody] RunRequest request)
         {
-            string fileName = $"Scripts/scripts.js";
-
-            if (!System.IO.File.Exists(fileName))
-                return NotFound();
-
-            var script = System.IO.File.ReadAllText(fileName);
-
-            _engine.SetValue("FindById", new Func<string, string, string>(_context.FindById));
-            _engine.SetValue("Insert", new Func<string, object, bool>(_context.Insert));
-            _engine.SetValue("ExecSqlProcedure", new Func<string, object, object>(_context.ExecSqlProcedure));
-
-            _engine.Execute(script);
             _engine.Execute($"var result = {request.TableName.ToLower()}.{request.Method.ToLower()}({request.Params});");
-
             return Ok(_engine.GetValue("result").ToString());
         }
     }
