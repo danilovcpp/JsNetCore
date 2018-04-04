@@ -9,12 +9,13 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Text;
 using System.Diagnostics;
+using System.Data;
 
 namespace JsNetCore.Models
 {
     public class Context
     {
-        private string connectionString = "Server=localhost;Port=5432;User Id = postgres; Password=123;Database=ownRadio;";
+        private string connectionString = "Server=localhost;Port=5432;User Id = postgres; Password=123;Database=ownRadioRdev;";
 
         public string Exec(string query)
         {
@@ -95,13 +96,15 @@ namespace JsNetCore.Models
         /// <param name="procedure">Название SQL процедуры</param>
         /// <param name="tableName">Название таблицы</param>
         /// <param name="param">Параметры необходимые для определенной SQL процедуры</param>
-        /// <returns></returns>
+        /// <returns>Результат выполнения метода в строковом виде</returns>
         public string ExecSqlProcedure(string procedure, string tableName, object param)
         {
             if (procedure.ToLower() == "insert")
                 return Insert(tableName, param) ? "true" : "false";
             else if (procedure.ToLower() == "findbyid")
                 return FindById(tableName, param.ToString());
+            else if (procedure.ToLower() == "nexttrack")
+                return NextTrack(param.ToString()).ToString();
 
             return string.Empty;
         } 
@@ -118,9 +121,11 @@ namespace JsNetCore.Models
         {
             var obj = new JObject();
 
+            id = id.Replace("'", "");
+
             using (var npgSqlConnection = new NpgsqlConnection(connectionString))
             {
-                var npgSqlCommand = new NpgsqlCommand($"SELECT * FROM {tableName} WHERE \"recId\" = '{id}'");
+                var npgSqlCommand = new NpgsqlCommand($"SELECT * FROM {tableName} WHERE recid = '{id}'");
 
                 try
                 {
@@ -161,12 +166,14 @@ namespace JsNetCore.Models
             Dictionary<string, string> param = new Dictionary<string, string>();
 
             foreach (var x in par)
-                param.Add($"\"{x.Key}\"", $"'{x.Value.ToString()}'");
+            {
+                param.Add(x.Key.ToLower(), $"'{x.Value.ToString()}'");
+            }
 
             string cmdParams = String.Join(',', param.Keys);
             string cmdArgs = String.Join(',', param.Values);
 
-            if (FindById(tableName, param["\"recId\""]) != "")
+            if (FindById(tableName, param["recid"]) != "")
                 return false;
 
             using (var npgSqlConnection = new NpgsqlConnection(connectionString))
@@ -187,6 +194,29 @@ namespace JsNetCore.Models
             }
 
             return true;
+        }
+        #endregion
+
+        #region Получение id следующего трека
+        /// <summary>
+        /// Метод получения id для следующего трека
+        /// </summary>
+        /// <param name="deviceId">UUID устройства с которого получаем id трека</param>
+        /// <returns>UUID трека</returns>
+        public Guid NextTrack(string deviceId)
+        {
+            var nextTrackID = Guid.Empty;
+            using (var npgSqlConnection = new NpgsqlConnection(connectionString))
+            {
+                var npgSqlCommand = new NpgsqlCommand();
+                npgSqlCommand.CommandText = "getnexttrackid";
+                npgSqlCommand.Connection = npgSqlConnection;
+                npgSqlCommand.CommandType = CommandType.StoredProcedure;
+                npgSqlCommand.Parameters.AddWithValue("i_deviceid", Guid.Parse(deviceId));
+                npgSqlConnection.Open();
+                nextTrackID = (Guid)npgSqlCommand.ExecuteScalar();
+            }
+            return nextTrackID;
         } 
         #endregion
     }
