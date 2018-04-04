@@ -89,27 +89,6 @@ namespace JsNetCore.Models
             return JsonConvert.SerializeObject(list);
         }
 
-        #region Запуск SQL процедур
-        /// <summary>
-        /// Метод запускающий на выполнение SQL процедуры
-        /// </summary>
-        /// <param name="procedure">Название SQL процедуры</param>
-        /// <param name="tableName">Название таблицы</param>
-        /// <param name="param">Параметры необходимые для определенной SQL процедуры</param>
-        /// <returns>Результат выполнения метода в строковом виде</returns>
-        public string ExecSqlProcedure(string procedure, string tableName, object param)
-        {
-            if (procedure.ToLower() == "insert")
-                return Insert(tableName, param) ? "true" : "false";
-            else if (procedure.ToLower() == "findbyid")
-                return FindById(tableName, param.ToString());
-            else if (procedure.ToLower() == "nexttrack")
-                return NextTrack(param.ToString()).ToString();
-
-            return string.Empty;
-        } 
-        #endregion
-
         #region Поиск в таблице по UUID
         /// <summary>
         /// Поиск строки в таблице по id
@@ -197,24 +176,27 @@ namespace JsNetCore.Models
         }
         #endregion
 
-        #region Получение id следующего трека
-        /// <summary>
-        /// Метод получения id для следующего трека
-        /// </summary>
-        /// <param name="deviceId">UUID устройства с которого получаем id трека</param>
-        /// <returns>UUID трека</returns>
-        public Guid NextTrack(string deviceId)
+        #region Выполнение SQL процедур
+
+        public object ExecSqlProcedure(string functionName, object parameters)
         {
-            var nextTrackID = Guid.Empty;
+            var par = JObject.FromObject(parameters);
+            object nextTrackID;
+
             using (var npgSqlConnection = new NpgsqlConnection(connectionString))
             {
                 var npgSqlCommand = new NpgsqlCommand();
-                npgSqlCommand.CommandText = "getnexttrackid";
+                npgSqlCommand.CommandText = functionName;
                 npgSqlCommand.Connection = npgSqlConnection;
                 npgSqlCommand.CommandType = CommandType.StoredProcedure;
-                npgSqlCommand.Parameters.AddWithValue("i_deviceid", Guid.Parse(deviceId));
+
+                foreach (var x in par)
+                {
+                    npgSqlCommand.Parameters.AddWithValue(x.Key.ToLower(), Guid.Parse(x.Value.ToString()));
+                }
+
                 npgSqlConnection.Open();
-                nextTrackID = (Guid)npgSqlCommand.ExecuteScalar();
+                nextTrackID = npgSqlCommand.ExecuteScalar();
             }
             return nextTrackID;
         } 

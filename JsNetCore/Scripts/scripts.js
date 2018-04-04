@@ -3,50 +3,45 @@
         if (params.recId == null || params.recName == null)
             return false;
 
-        return ExecSqlProcedure("Insert", "devices", params);
+        return Insert("devices", params);
     },
 
     findbyrecid: function (params) {
-        return ExecSqlProcedure("findbyid", "devices", params.recId);
+        return FindById("devices", params.recId);
     }
 }
 
 var tracks = {
 
     next: function (params) {
-        return ExecSqlProcedure("nexttrack", "tracks", params.deviceId);
+        return ExecSqlProcedure("getnexttrackid", { "i_deviceid": params.deviceId });
     },
 
     insert: function (params) {
         if (params.recId == null)
             return false;
 
-        return ExecSqlProcedure("Insert", "tracks", params);
+        return Insert("tracks", params);
     },
 
     findbyrecid: function (params) {
-        return ExecSqlProcedure("findbyid", "tracks", params.recId);
+        return FindById("tracks", params.recId);
     }
 }
 
 var histories = {
     insert: function (params) {
-        //if (devices.findbyrecid(params.deviceId) == null || tracks.findbyrecid(params.trackId) == null)
-            //return false;
+
+        if (devices.findbyrecid({ recId: params.deviceId }) == null || tracks.findbyrecid({ recId: params.trackId }) == null)
+            return false;
 
         if (params.recId == null)
             return false;
 
-        return ExecSqlProcedure("Insert", "histories", params);
-        /*if (historyJson != null) {
-            var historyTemp = JSON.parse(historyJson);
-            historyTemp.countsend = historyTemp.countsend == null ? 0 : ++historyTemp.countsend;
-
-            return ExecSqlProcedure("Insert", "histories", historyTemp);
-        }*/
+        return Insert("histories", params);
     },
 
     findbyrecid: function (params) {
-        return ExecSqlProcedure("findbyid", "histories", params.recId);
+        return FindById("histories", params.recId);
     }
 }

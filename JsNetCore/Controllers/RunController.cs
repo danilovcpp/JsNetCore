@@ -32,10 +32,9 @@ namespace JsNetCore.Controllers
 
             var script = System.IO.File.ReadAllText(fileName);
 
-            _engine.SetValue("ExecSqlProcedure", new Func<string, string, object, string>(_context.ExecSqlProcedure));
             _engine.SetValue("FindById", new Func<string, string, string>(_context.FindById));
             _engine.SetValue("Insert", new Func<string, object, bool>(_context.Insert));
-            _engine.SetValue("NextTrack", new Func<string, Guid>(_context.NextTrack));
+            _engine.SetValue("ExecSqlProcedure", new Func<string, object, object>(_context.ExecSqlProcedure));
 
             _engine.Execute(script);
             _engine.Execute($"var result = {request.TableName.ToLower()}.{request.Method.ToLower()}({request.Params});");
