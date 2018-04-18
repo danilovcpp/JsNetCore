@@ -9,6 +9,7 @@ namespace JsNetCore.Models
     {
         public string TableName { get; set; }
         public string Method { get; set; }
+        public ResultTypeEnum ResultType { get; set; }
         public object Params { get; set; }
     }
 }
