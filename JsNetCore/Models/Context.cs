@@ -96,34 +96,32 @@ namespace JsNetCore.Models
         /// <param name="tableName">Название таблицы</param>
         /// <param name="id"> UUID по которому получаем значения строки в таблице</param>
         /// <returns>Результат выборки из таблицы в строковом виде в формате json</returns>
-        public string FindById(string tableName, string id)
+        public string FindByRecid(string tableName, string id)
         {
             var obj = new JObject();
 
-            id = id.Replace("'", "");
-
             using (var npgSqlConnection = new NpgsqlConnection(connectionString))
             {
-                var npgSqlCommand = new NpgsqlCommand($"SELECT * FROM {tableName} WHERE recid = '{id}'");
-
                 try
                 {
-                    npgSqlConnection.Open();
-                    npgSqlCommand.Connection = npgSqlConnection;
-
-                    NpgsqlDataReader reader = npgSqlCommand.ExecuteReader();
-
-                    if (reader.Read())
+                    using (var npgSqlCommand = new NpgsqlCommand($"SELECT * FROM {tableName} WHERE recid = '{id}'"))
                     {
-                        for (int i = 0; i < reader.FieldCount; i++)
+                        npgSqlConnection.Open();
+                        npgSqlCommand.Connection = npgSqlConnection;
+
+                        NpgsqlDataReader reader = npgSqlCommand.ExecuteReader();
+
+                        if (reader.Read())
                         {
-                            obj.Add(reader.GetName(i), reader.GetValue(i).ToString());
+                            for (int i = 0; i < reader.FieldCount; i++)
+                            {
+                                obj.Add(reader.GetName(i), reader.GetValue(i).ToString());
+                            }
                         }
                     }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    Debug.Print(ex.Message);
                     return string.Empty;
                 }
             }
@@ -138,36 +136,24 @@ namespace JsNetCore.Models
         /// </summary>
         /// <param name="tableName">Название таблицы</param>
         /// <param name="parameters">Набор полей таблицы</param>
-        /// <returns></returns>
+        /// <returns>Результат выполнения операции</returns>
         public bool Insert(string tableName, object parameters)
         {
-            var par = JObject.FromObject(parameters);
-            Dictionary<string, string> param = new Dictionary<string, string>();
-
-            foreach (var x in par)
-            {
-                param.Add(x.Key.ToLower(), $"'{x.Value.ToString()}'");
-            }
-
-            string cmdParams = String.Join(',', param.Keys);
-            string cmdArgs = String.Join(',', param.Values);
-
-            if (FindById(tableName, param["recid"]) != "")
-                return false;
+            string[] param = ParseQueryParameters(parameters);
 
             using (var npgSqlConnection = new NpgsqlConnection(connectionString))
             {
-                var npgSqlCommand = new NpgsqlCommand($"INSERT INTO {tableName}({cmdParams}) VALUES({cmdArgs})");
-
                 try
                 {
-                    npgSqlConnection.Open();
-                    npgSqlCommand.Connection = npgSqlConnection;
-                    npgSqlCommand.ExecuteNonQuery();
+                    using (var npgSqlCommand = new NpgsqlCommand($"INSERT INTO {tableName}({param[0]}) VALUES({param[1]})"))
+                    {
+                        npgSqlConnection.Open();
+                        npgSqlCommand.Connection = npgSqlConnection;
+                        npgSqlCommand.ExecuteNonQuery();
+                    }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    Debug.Print(ex.Message);
                     return false;
                 }
             }
@@ -199,7 +185,131 @@ namespace JsNetCore.Models
                 nextTrackID = npgSqlCommand.ExecuteScalar();
             }
             return nextTrackID;
-        } 
+        }
         #endregion
+
+        #region Получение содержимого файла
+        /// <summary>
+        /// Получение содержимого файла
+        /// </summary>
+        /// <param name="path">Путь к файлу </param>
+        /// <returns>Байт массив(при отладке текстовое содержимое файла)</returns>
+        public FileStream LoadFile(string path)
+        {
+            string textFromFile = string.Empty;
+            byte[] array;
+
+            if (!File.Exists(path))
+                return null;
+
+            return File.OpenRead(path);
+
+            /*using (FileStream fstream = File.OpenRead(path))
+            {
+                array = new byte[fstream.Length];
+                fstream.Read(array, 0, array.Length);
+
+                //textFromFile = Encoding.Default.GetString(array);
+            }*/
+
+            //return array;
+        }
+        #endregion
+
+        #region Обновление данных таблицы
+        /// <summary>
+        /// Метод обновления значения в таблице
+        /// </summary>
+        /// <param name="tableName">Название таблицы</param>
+        /// <param name="parameters">Параметры</param>
+        /// <returns>Результат выполнения операции, true/false</returns>
+        public bool UpdateByRecid(string tableName, string recid, object parameters)
+        {
+            string[] param = ParseQueryParameters(parameters);
+
+            using (var npgSqlConnection = new NpgsqlConnection(connectionString))
+            {
+                try
+                {                    
+                    using (var npgSqlCommand = new NpgsqlCommand($"UPDATE {tableName} SET ({param[0]}) = ({param[1]}) WHERE recid = '{recid}'"))
+                    {
+                        npgSqlConnection.Open();
+                        npgSqlCommand.Connection = npgSqlConnection;
+                        npgSqlCommand.ExecuteNonQuery();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.Print(ex.Message);
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        #endregion
+
+        #region Поиск в таблице по параметрам
+        /// <summary>
+        /// Поиск в таблице по параметрам
+        /// </summary>
+        /// <param name="tableName">Название таблицы</param>
+        /// <param name="parameters">Параметры запроса</param>
+        /// <returns>Результат SQL запроса</returns>
+        public string FindByParams(string tableName, object parameters)
+        {
+            var objArray = new JArray();
+            string[] param = ParseQueryParameters(parameters);
+
+            using (var npgSqlConnection = new NpgsqlConnection(connectionString))
+            {
+                try
+                {
+                    using (var npgSqlCommand = new NpgsqlCommand($"SELECT * FROM {tableName} WHERE ({param[0]}) = ({param[1]})"))
+                    {
+                        npgSqlConnection.Open();
+                        npgSqlCommand.Connection = npgSqlConnection;
+
+                        NpgsqlDataReader reader = npgSqlCommand.ExecuteReader();
+
+                        while (reader.Read())
+                        {
+                            var obj = new JObject();
+
+                            for (int i = 0; i < reader.FieldCount; i++)
+                            {
+                                obj.Add(reader.GetName(i), reader.GetValue(i).ToString());
+                            }
+
+                            objArray.Add(obj);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.Print(ex.Message);
+                    return string.Empty;
+                }
+            }
+
+            return objArray.Count > 0 ? JsonConvert.SerializeObject(objArray) : string.Empty;
+        }
+        #endregion
+
+        private string[] ParseQueryParameters(object parameters)
+        {
+            var par = JObject.FromObject(parameters);
+            Dictionary<string, string> param = new Dictionary<string, string>();
+
+            foreach (var x in par)
+            {
+                param.Add(x.Key.ToLower(), $"'{x.Value.ToString()}'");
+            }
+
+            string cmdParams = String.Join(',', param.Keys);
+            string cmdArgs = String.Join(',', param.Values);
+
+            return new string[] { cmdParams, cmdArgs };
+        }
     }
 }
