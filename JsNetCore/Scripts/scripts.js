@@ -4,14 +4,14 @@
         if (params.recid == null)
             return false;
 
-        var deviceJson = devices.find("devices", params);
+        var deviceJson = devices.findbyrecid("devices", params);
         if (deviceJson != "")
             return false;
 
         if (params.recname == null)
             params.recname = "New unknow device";
 
-        var userJson = users.find(params.recid);
+        var userJson = users.findbyrecid(params);
         var user = null;
 
         if (userJson != "")
@@ -29,7 +29,7 @@
 
         return (uresult && dresult);
     },
-    find: function (params) {
+    findbyrecid: function (params) {
         if (params.recid == null)
             return false;
 
@@ -40,14 +40,14 @@
 var histories = {
     save: function (params) {
 
-        if (devices.find({ recid: params.deviceid }) == "" || tracks.find({ recid: params.trackid }) == "")
+        if (devices.findbyrecid({ recid: params.deviceid }) == "" || tracks.findbyrecid({ recid: params.trackid }) == "")
             return false;
 
         if (params.recid == null)
             return false;
 
         var historyTemp = null;
-        var historyTempJson = histories.find(params);
+        var historyTempJson = histories.findbyrecid(params);
 
         if (historyTempJson != "")
             historyTemp = JSON.parse(historyTempJson);
@@ -91,7 +91,7 @@ var histories = {
 
         return dbresult;
     },
-    find: function (params) {
+    findbyrecid: function (params) {
         if (params.recid == null)
             return false;
 
@@ -109,7 +109,7 @@ var tracks = {
 
         return Insert("tracks", params);
     },
-    find: function (params) {
+    findbyrecid: function (params) {
         if (params.recid == null)
             return "";
 
@@ -133,7 +133,7 @@ var tracks = {
         }
     },
     listen: function (params) {
-        tracks.find(params);
+        tracks.findbyrecid(params);
         return tracks.fileMp3.getBlob();
     }
 }
@@ -145,11 +145,11 @@ var users = {
 
         return Insert("users", params);
     },
-    find: function (recid) {
-        if (recid == null)
+    findbyrecid: function (params) {
+        if (params.recid == null)
             return false;
 
-        return FindByRecid("users", recid);
+        return FindByRecid("users", params.recid);
     }
 }
 
@@ -172,7 +172,7 @@ var ratings = {
 
         return FindByParams("ratings", params);
     },
-    find: function (recid) {
+    findbyrecid: function (recid) {
         if (recid == null)
             return false;
 
