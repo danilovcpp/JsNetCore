@@ -196,23 +196,10 @@ namespace JsNetCore.Models
         /// <returns>Байт массив(при отладке текстовое содержимое файла)</returns>
         public FileStream LoadFile(string path)
         {
-            string textFromFile = string.Empty;
-            byte[] array;
-
             if (!File.Exists(path))
                 return null;
 
             return File.OpenRead(path);
-
-            /*using (FileStream fstream = File.OpenRead(path))
-            {
-                array = new byte[fstream.Length];
-                fstream.Read(array, 0, array.Length);
-
-                //textFromFile = Encoding.Default.GetString(array);
-            }*/
-
-            //return array;
         }
         #endregion
 
@@ -238,9 +225,8 @@ namespace JsNetCore.Models
                         npgSqlCommand.ExecuteNonQuery();
                     }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    Debug.Print(ex.Message);
                     return false;
                 }
             }
@@ -285,9 +271,8 @@ namespace JsNetCore.Models
                         }
                     }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    Debug.Print(ex.Message);
                     return string.Empty;
                 }
             }
@@ -298,6 +283,9 @@ namespace JsNetCore.Models
 
         private string[] ParseQueryParameters(object parameters)
         {
+            if (parameters == null)
+                return null;
+
             var par = JObject.FromObject(parameters);
             Dictionary<string, string> param = new Dictionary<string, string>();
 
