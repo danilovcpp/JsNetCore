@@ -12,73 +12,84 @@ using Newtonsoft.Json.Linq;
 
 namespace JsNetCore.Controllers
 {
-    [Produces("application/json")]
-    [Route("api/[controller]/[action]")]
-    public class RunController : Controller
-    {
-        private readonly Engine _engine = new Engine();
-        private readonly Context _context = new Context();
-        
-        public RunController()
-        {
-            string[] dirs = Directory.GetFiles(@"Scripts", "*.js");
-            string script = "";
+	[Produces("application/json")]
+	[Route("api/[controller]/[action]")]
+	public class RunController : Controller
+	{
+		private readonly Engine _engine = new Engine();
+		private readonly Context _context = new Context();
 
-            foreach (string file in dirs)
-            {
-                script += System.IO.File.ReadAllText(file);
-            }
+		public RunController()
+		{
+			string[] dirs = Directory.GetFiles(@"Scripts", "*.js");
+			string script = "";
 
-            _engine.SetValue("FindByRecid", new Func<string, string, string>(_context.FindByRecid));
-            _engine.SetValue("Insert", new Func<string, object, bool>(_context.Insert));
-            _engine.SetValue("ExecSqlProcedure", new Func<string, object, object>(_context.ExecSqlProcedure));
-            _engine.SetValue("LoadFile", new Func<string, FileStream>(_context.LoadFile)); 
-            _engine.SetValue("UpdateByRecid", new Func<string, string, object, bool>(_context.UpdateByRecid));
-            _engine.SetValue("FindByParams", new Func<string, object, string>(_context.FindByParams));
+			foreach (string file in dirs)
+			{
+				script += System.IO.File.ReadAllText(file);
+			}
 
-            _engine.Execute(script);
-        }
+			_engine.SetValue("FindByRecid", new Func<string, string, string>(_context.FindByRecid));
+			_engine.SetValue("Insert", new Func<string, object, MethodResult>(_context.Insert));
+			_engine.SetValue("ExecSqlProcedure", new Func<string, object, object>(_context.ExecSqlProcedure));
+			_engine.SetValue("LoadFile", new Func<string, FileStream>(_context.LoadFile));
+			_engine.SetValue("UpdateByRecid", new Func<string, string, object, bool>(_context.UpdateByRecid));
+			_engine.SetValue("FindByParams", new Func<string, object, string>(_context.FindByParams));
+			_engine.SetValue("SaveFile", new Func<string, string, Task<MethodResult>>(_context.SaveFile));
+			_engine.SetValue("DownloadFile", new Func<string, Task<MethodResult>>(_context.DownloadFile));
+			_engine.SetValue("UnpackArchive", new Func<string, MethodResult>(_context.UnpackArchive));
 
-        /// <summary>
-        /// Метод запускающий на выполнение js функцию
-        /// </summary>
-        /// <param name="request">Список параметров передаваемых в теле запроса</param>
-        /// <returns>Результат выполнения метода в строковом виде</returns>
-        [HttpPost(Name = "ExecuteJS")]
-        public IActionResult ExecuteJS([FromBody] RunRequest request)
-        {
-            if(request.ResultType == ResultTypeEnum.FileStream)
-            {
-                _engine.Execute($"var result = tracks.listen({request.Params})");
-                object result = _engine.GetValue("result").ToObject();
-                if (result == null)
-                    return StatusCode(500);
+			_engine.Execute(script);
+		}
 
-                return new FileStreamResult((FileStream)result, "audio/mpeg");
-            }
+		/// <summary>
+		/// Метод запускающий на выполнение js функцию
+		/// </summary>
+		/// <param name="request">Список параметров передаваемых в теле запроса</param>
+		/// <returns>Результат выполнения метода в строковом виде</returns>
+		[HttpPost(Name = "ExecuteJS")]
+		public IActionResult ExecuteJS([FromBody] RunRequest request)
+		{
+			try
+			{
+				if (request.ResultType == ResultTypeEnum.FileStream)
+				{
+					_engine.Execute($"var result = tracks.listen({request.Params})");
+					object result = _engine.GetValue("result").ToObject();
+					if (result == null)
+						return StatusCode(500);
 
-            _engine.Execute($"var result = {request.TableName.ToLower()}.{request.Method.ToLower()}({request.Params});");
-            return Ok(_engine.GetValue("result").ToString());
-        }
-        
-        // Тестовый метод для воспроизведения трэка
-        [HttpGet(Name = "ListenTrack")]
-        public IActionResult ListenTrack()
-        {
-            _engine.Execute($"var result = listen({"{ recId :\"634c67d3-5a80-40c7-8555-9da264a5353f\" }"});");
+					return new FileStreamResult((FileStream)result, "audio/mpeg");
+				}
 
-            object result = _engine.GetValue("result").ToObject();
-            if (result == null) return StatusCode(500);
+				_engine.Execute($"var result = {request.TableName.ToLower()}.{request.Method.ToLower()}({request.Params});");
+				return Ok(_engine.GetValue("result").ToString());
+			}
+			catch(Exception ex)
+			{
+				return StatusCode(500, ex.Message);
+			}
 
-            return new FileStreamResult((FileStream)result, "audio/mpeg");
-        }
+		}
 
-        // Тестовый метод для получения значения определенного поля
-        [HttpGet(Name = "InfoTrack")]
-        public IActionResult InfoTrack()
-        {
-            _engine.Execute($"var newResult = tracks.fields.recid.value;");
-            return Ok(_engine.GetValue("newResult").ToString());
-        }
-    }
+		// Тестовый метод для воспроизведения трэка
+		[HttpGet(Name = "ListenTrack")]
+		public IActionResult ListenTrack()
+		{
+			_engine.Execute($"var result = listen({"{ recId :\"634c67d3-5a80-40c7-8555-9da264a5353f\" }"});");
+
+			object result = _engine.GetValue("result").ToObject();
+			if (result == null) return StatusCode(500);
+
+			return new FileStreamResult((FileStream)result, "audio/mpeg");
+		}
+
+		// Тестовый метод для получения значения определенного поля
+		[HttpGet(Name = "InfoTrack")]
+		public IActionResult InfoTrack()
+		{
+			_engine.Execute($"var newResult = tracks.fields.recid.value;");
+			return Ok(_engine.GetValue("newResult").ToString());
+		}
+	}
 }
