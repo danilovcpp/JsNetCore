@@ -29,14 +29,14 @@ namespace JsNetCore.Controllers
 				script += System.IO.File.ReadAllText(file);
 			}
 
-			_engine.SetValue("FindByRecid", new Func<string, string, string>(_context.FindByRecid));
+			_engine.SetValue("FindByRecid", new Func<string, string, MethodResult>(_context.FindByRecid));
 			_engine.SetValue("Insert", new Func<string, object, MethodResult>(_context.Insert));
-			_engine.SetValue("ExecSqlProcedure", new Func<string, object, object>(_context.ExecSqlProcedure));
-			_engine.SetValue("LoadFile", new Func<string, FileStream>(_context.LoadFile));
-			_engine.SetValue("UpdateByRecid", new Func<string, string, object, bool>(_context.UpdateByRecid));
-			_engine.SetValue("FindByParams", new Func<string, object, string>(_context.FindByParams));
-			_engine.SetValue("SaveFile", new Func<string, string, Task<MethodResult>>(_context.SaveFile));
-			_engine.SetValue("DownloadFile", new Func<string, Task<MethodResult>>(_context.DownloadFile));
+			_engine.SetValue("ExecSqlProcedure", new Func<string, object, MethodResult>(_context.ExecSqlProcedure));
+			_engine.SetValue("LoadFile", new Func<string, MethodResult>(_context.LoadFile));
+			_engine.SetValue("UpdateByRecid", new Func<string, string, object, MethodResult>(_context.UpdateByRecid));
+			_engine.SetValue("FindByParams", new Func<string, object, MethodResult>(_context.FindByParams));
+			//_engine.SetValue("SaveFile", new Func<string, string, Task<MethodResult>>(_context.SaveFile));
+			_engine.SetValue("DownloadFile", new Func<string, MethodResult>(_context.DownloadFile));
 			_engine.SetValue("UnpackArchive", new Func<string, MethodResult>(_context.UnpackArchive));
 
 			_engine.Execute(script);
@@ -54,7 +54,7 @@ namespace JsNetCore.Controllers
 			{
 				if (request.ResultType == ResultTypeEnum.FileStream)
 				{
-					_engine.Execute($"var result = tracks.listen({request.Params})");
+					_engine.Execute($"var result = {request.Method.ToLower()}({request.Params})");
 					object result = _engine.GetValue("result").ToObject();
 					if (result == null)
 						return StatusCode(500);
@@ -62,8 +62,9 @@ namespace JsNetCore.Controllers
 					return new FileStreamResult((FileStream)result, "audio/mpeg");
 				}
 
-				_engine.Execute($"var result = {request.TableName.ToLower()}.{request.Method.ToLower()}({request.Params});");
-				return Ok(_engine.GetValue("result").ToString());
+				_engine.Execute($"var result = {request.Method.ToLower()}({request.Params})");
+				//_engine.Execute($"var result = {request.TableName.ToLower()}.{request.Method.ToLower()}({request.Params});");
+				return Ok(_engine.GetValue("result").ToObject());
 			}
 			catch(Exception ex)
 			{
@@ -76,7 +77,7 @@ namespace JsNetCore.Controllers
 		[HttpGet(Name = "ListenTrack")]
 		public IActionResult ListenTrack()
 		{
-			_engine.Execute($"var result = listen({"{ recId :\"634c67d3-5a80-40c7-8555-9da264a5353f\" }"});");
+			_engine.Execute($"var result = gettrack({"{ recid :\"00b60b06-f64d-429b-b461-980f25a566bd\" }"});");
 
 			object result = _engine.GetValue("result").ToObject();
 			if (result == null) return StatusCode(500);

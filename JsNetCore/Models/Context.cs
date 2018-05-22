@@ -93,38 +93,41 @@ namespace JsNetCore.Models
 		/// </summary>
 		/// <param name="tableName">Название таблицы</param>
 		/// <param name="id"> UUID по которому получаем значения строки в таблице</param>
-		/// <returns>Результат выборки из таблицы в строковом виде в формате json</returns>
-		public string FindByRecid(string tableName, string id)
+		/// <returns>MethodResult</returns>
+		public MethodResult FindByRecid(string tableName, string id)
 		{
 			var obj = new JObject();
+			var result = new MethodResult();
 
-			using (var npgSqlConnection = new NpgsqlConnection(connectionString))
+			try
 			{
-				try
+				using (var npgSqlConnection = new NpgsqlConnection(connectionString))
+				using (var npgSqlCommand = new NpgsqlCommand($"SELECT * FROM {tableName} WHERE recid = '{id}'"))
 				{
-					using (var npgSqlCommand = new NpgsqlCommand($"SELECT * FROM {tableName} WHERE recid = '{id}'"))
+					npgSqlConnection.Open();
+					npgSqlCommand.Connection = npgSqlConnection;
+
+					NpgsqlDataReader reader = npgSqlCommand.ExecuteReader();
+
+					if (reader.Read())
 					{
-						npgSqlConnection.Open();
-						npgSqlCommand.Connection = npgSqlConnection;
-
-						NpgsqlDataReader reader = npgSqlCommand.ExecuteReader();
-
-						if (reader.Read())
+						for (int i = 0; i < reader.FieldCount; i++)
 						{
-							for (int i = 0; i < reader.FieldCount; i++)
-							{
-								obj.Add(reader.GetName(i), reader.GetValue(i).ToString());
-							}
+							obj.Add(reader.GetName(i), reader.GetValue(i).ToString());
 						}
 					}
-				}
-				catch (Exception)
-				{
-					return string.Empty;
+
+					result.Data = obj.Count > 0 ? JsonConvert.SerializeObject(obj) : null;
+					result.Success = true;
 				}
 			}
+			catch (Exception ex)
+			{
+				result.Message = $"Не удалось получить сведения из таблицы {tableName}:{ex.Message}";
+				result.Success = false;
+			}
 
-			return obj.Count > 0 ? JsonConvert.SerializeObject(obj) : string.Empty;
+			return result;
 		}
 		#endregion
 
@@ -138,26 +141,25 @@ namespace JsNetCore.Models
 		public MethodResult Insert(string tableName, object parameters)
 		{
 			var result = new MethodResult();
-			string[] param = ParseQueryParameters(parameters);
 
-			using (var npgSqlConnection = new NpgsqlConnection(connectionString))
+			try
 			{
-				try
-				{
-					using (var npgSqlCommand = new NpgsqlCommand($"INSERT INTO {tableName}({param[0]}) VALUES({param[1]})"))
-					{
-						npgSqlConnection.Open();
-						npgSqlCommand.Connection = npgSqlConnection;
-						npgSqlCommand.ExecuteNonQuery();
+				string[] param = ParseQueryParameters(parameters);
 
-						result.Success = true;
-					}
-				}
-				catch (Exception ex)
+				using (var npgSqlConnection = new NpgsqlConnection(connectionString))
+				using (var npgSqlCommand = new NpgsqlCommand($"INSERT INTO {tableName}({param[0]}) VALUES({param[1]})"))
 				{
-					result.Message = ex.Message;
-					result.Success = false;
+					npgSqlConnection.Open();
+					npgSqlCommand.Connection = npgSqlConnection;
+					npgSqlCommand.ExecuteNonQuery();
 				}
+
+				result.Success = true;
+			}
+			catch (Exception ex)
+			{
+				result.Message = $"Не удалось добавить значение в таблицу {tableName}:{ex.Message}";
+				result.Success = false;
 			}
 
 			return result;
@@ -165,28 +167,40 @@ namespace JsNetCore.Models
 		#endregion
 
 		#region Выполнение SQL процедур
-
-		public object ExecSqlProcedure(string functionName, object parameters)
+		public MethodResult ExecSqlProcedure(string functionName, object parameters)
 		{
-			var par = JObject.FromObject(parameters);
-			object nextTrackID;
+			var result = new MethodResult();
+			object nextTrackID = null;
 
-			using (var npgSqlConnection = new NpgsqlConnection(connectionString))
+			try
 			{
-				var npgSqlCommand = new NpgsqlCommand();
-				npgSqlCommand.CommandText = functionName;
-				npgSqlCommand.Connection = npgSqlConnection;
-				npgSqlCommand.CommandType = CommandType.StoredProcedure;
-
-				foreach (var x in par)
+				var par = JObject.FromObject(parameters);
+				using (var npgSqlConnection = new NpgsqlConnection(connectionString))
 				{
-					npgSqlCommand.Parameters.AddWithValue(x.Key.ToLower(), Guid.Parse(x.Value.ToString()));
-				}
+					var npgSqlCommand = new NpgsqlCommand();
+					npgSqlCommand.CommandText = functionName;
+					npgSqlCommand.Connection = npgSqlConnection;
+					npgSqlCommand.CommandType = CommandType.StoredProcedure;
 
-				npgSqlConnection.Open();
-				nextTrackID = npgSqlCommand.ExecuteScalar();
+					foreach (var x in par)
+					{
+						npgSqlCommand.Parameters.AddWithValue(x.Key.ToLower(), Guid.Parse(x.Value.ToString()));
+					}
+
+					npgSqlConnection.Open();
+					nextTrackID = npgSqlCommand.ExecuteScalar();
+
+					result.Data = nextTrackID;
+					result.Success = true;
+				}
 			}
-			return nextTrackID;
+			catch (Exception ex)
+			{
+				result.Message = ex.Message;
+				result.Success = false;
+			}
+
+			return result;
 		}
 		#endregion
 
@@ -196,12 +210,22 @@ namespace JsNetCore.Models
 		/// </summary>
 		/// <param name="path">Путь к файлу </param>
 		/// <returns>Байт массив(при отладке текстовое содержимое файла)</returns>
-		public FileStream LoadFile(string path)
+		public MethodResult LoadFile(string path)
 		{
-			if (!File.Exists(path))
-				return null;
+			var result = new MethodResult();
 
-			return File.OpenRead(path);
+			try
+			{
+				result.Data = File.OpenRead(path);
+				result.Success = true;
+			}
+			catch (Exception ex)
+			{
+				result.Message = ex.Message;
+				result.Success = false;
+			}
+
+			return result;
 		}
 		#endregion
 
@@ -212,28 +236,31 @@ namespace JsNetCore.Models
 		/// <param name="tableName">Название таблицы</param>
 		/// <param name="parameters">Параметры</param>
 		/// <returns>Результат выполнения операции, true/false</returns>
-		public bool UpdateByRecid(string tableName, string recid, object parameters)
+		public MethodResult UpdateByRecid(string tableName, string recid, object parameters)
 		{
-			string[] param = ParseQueryParameters(parameters);
+			var result = new MethodResult();
 
-			using (var npgSqlConnection = new NpgsqlConnection(connectionString))
+			try
 			{
-				try
+				string[] param = ParseQueryParameters(parameters);
+
+				using (var npgSqlConnection = new NpgsqlConnection(connectionString))
+				using (var npgSqlCommand = new NpgsqlCommand($"UPDATE {tableName} SET ({param[0]}) = ({param[1]}) WHERE recid = '{recid}'"))
 				{
-					using (var npgSqlCommand = new NpgsqlCommand($"UPDATE {tableName} SET ({param[0]}) = ({param[1]}) WHERE recid = '{recid}'"))
-					{
-						npgSqlConnection.Open();
-						npgSqlCommand.Connection = npgSqlConnection;
-						npgSqlCommand.ExecuteNonQuery();
-					}
+					npgSqlConnection.Open();
+					npgSqlCommand.Connection = npgSqlConnection;
+					npgSqlCommand.ExecuteNonQuery();
 				}
-				catch (Exception)
-				{
-					return false;
-				}
+
+				result.Success = true;
+			}
+			catch (Exception ex)
+			{
+				result.Message = ex.Message;
+				result.Success = false;
 			}
 
-			return true;
+			return result;
 		}
 		#endregion
 
@@ -244,66 +271,40 @@ namespace JsNetCore.Models
 		/// <param name="tableName">Название таблицы</param>
 		/// <param name="parameters">Параметры запроса</param>
 		/// <returns>Результат SQL запроса</returns>
-		public string FindByParams(string tableName, object parameters)
-		{
-			var objArray = new JArray();
-			string[] param = ParseQueryParameters(parameters);
-
-			using (var npgSqlConnection = new NpgsqlConnection(connectionString))
-			{
-				try
-				{
-					using (var npgSqlCommand = new NpgsqlCommand($"SELECT * FROM {tableName} WHERE ({param[0]}) = ({param[1]})"))
-					{
-						npgSqlConnection.Open();
-						npgSqlCommand.Connection = npgSqlConnection;
-
-						NpgsqlDataReader reader = npgSqlCommand.ExecuteReader();
-
-						while (reader.Read())
-						{
-							var obj = new JObject();
-
-							for (int i = 0; i < reader.FieldCount; i++)
-							{
-								obj.Add(reader.GetName(i), reader.GetValue(i).ToString());
-							}
-
-							objArray.Add(obj);
-						}
-					}
-				}
-				catch (Exception)
-				{
-					return string.Empty;
-				}
-			}
-
-			return objArray.Count > 0 ? JsonConvert.SerializeObject(objArray) : string.Empty;
-		}
-		#endregion
-
-		public async Task<MethodResult> SaveFile(string base64File, string type)
+		public MethodResult FindByParams(string tableName, object parameters)
 		{
 			var result = new MethodResult();
+			var objArray = new JArray();
 
 			try
 			{
-				string name = Guid.NewGuid().ToString() + type;
+				string[] param = ParseQueryParameters(parameters);
 
-				string directoryPath = Path.Combine(Directory.GetCurrentDirectory(), "Files");
-				string filePath = Path.Combine(directoryPath, name);
+				using (var npgSqlConnection = new NpgsqlConnection(connectionString))
+				using (var npgSqlCommand = new NpgsqlCommand($"SELECT * FROM {tableName} WHERE ({param[0]}) = ({param[1]})"))
+				{
+					npgSqlConnection.Open();
+					npgSqlCommand.Connection = npgSqlConnection;
 
-				if (!Directory.Exists(directoryPath))
-					Directory.CreateDirectory(directoryPath);
+					NpgsqlDataReader reader = npgSqlCommand.ExecuteReader();
 
-				byte[] file = Convert.FromBase64String(base64File);
-				await File.WriteAllBytesAsync(filePath, file);
+					while (reader.Read())
+					{
+						var obj = new JObject();
 
-				result.Data = name;
+						for (int i = 0; i < reader.FieldCount; i++)
+						{
+							obj.Add(reader.GetName(i), reader.GetValue(i).ToString());
+						}
+
+						objArray.Add(obj);
+					}
+				}
+
+				result.Data = objArray.Count > 0 ? JsonConvert.SerializeObject(objArray) : null;
 				result.Success = true;
 			}
-			catch(Exception ex)
+			catch (Exception ex)
 			{
 				result.Message = ex.Message;
 				result.Success = false;
@@ -311,8 +312,15 @@ namespace JsNetCore.Models
 
 			return result;
 		}
+		#endregion
 
-		public async Task<MethodResult> DownloadFile(string url)
+		#region Загрузка файла с удаленного ресурса по Url
+		/// <summary>
+		/// Загрузка файла с удаленного ресурса по Url
+		/// </summary>
+		/// <param name="url">Url адрес представляющий собой ссылку на загрузку файла</param>
+		/// <returns>MethodResult где свойство Data хранить локальный путь к загруженному файлу</returns>
+		public MethodResult DownloadFile(string url)
 		{
 			var result = new MethodResult() { Success = false };
 			HttpResponseMessage response = null;
@@ -328,27 +336,34 @@ namespace JsNetCore.Models
 						httpClient.Timeout = TimeSpan.FromMinutes(30);
 
 						using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Head, url))
-						using (response = await httpClient.SendAsync(request))
+						using (response = httpClient.SendAsync(request).Result)
 						{
 							var location = response.Headers.Location;
 							if (location != null)
 							{
-								response = await httpClient.GetAsync(location.OriginalString);
-								stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+								response = httpClient.GetAsync(location.OriginalString).Result;
+								stream = response.Content.ReadAsStreamAsync().Result;
 							}
 							else
 							{
-								stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+								stream = response.Content.ReadAsStreamAsync().Result;
 							}
 
-							string path = Path.Combine(
-								Directory.GetCurrentDirectory(), 
-								"Download", Guid.NewGuid().ToString() + "." + response.Content.Headers.ContentType.MediaType.Split("/").ToString()
+							string mediaType = response.Content.Headers.ContentType.MediaType;
+							string directoryPath = Path.Combine(Directory.GetCurrentDirectory(), "Download");
+
+							if (!Directory.Exists(directoryPath))
+							{
+								Directory.CreateDirectory(directoryPath);
+							}
+
+							string path = Path.Combine(directoryPath, Guid.NewGuid().ToString() + "." +
+								mediaType.Substring(mediaType.IndexOf('/') + 1)
 							);
 
 							using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write))
-							{ 
-								await stream.CopyToAsync(fs);
+							{
+								stream.CopyTo(fs);
 							}
 
 							result.Data = path;
@@ -357,7 +372,7 @@ namespace JsNetCore.Models
 					}
 				}
 			}
-			catch(Exception ex)
+			catch (Exception ex)
 			{
 				result.Message = ex.Message;
 				result.Success = false;
@@ -365,27 +380,36 @@ namespace JsNetCore.Models
 
 			return result;
 		}
+		#endregion
 
-		public MethodResult UnpackArchive(string srcPath)
+		#region Распаковка архива
+		/// <summary>
+		/// Распаковка архива, p.s тестировался только на .zip
+		/// </summary>
+		/// <param name="path">Локальный путь к архиву</param>
+		/// <returns> MethodResult, где в свойстве Data находится список экземпляров FileModel 
+		/// содержащих необходимую информацию о распакованных файлах
+		/// </returns>
+		public MethodResult UnpackArchive(string path)
 		{
 			var result = new MethodResult() { Success = false };
 			var model = new List<FileModel>();
 
-			var directoryPath = Path.Combine(Directory.GetCurrentDirectory(), "Files");
-
-			if (!Directory.Exists(directoryPath))
-			{
-				Directory.CreateDirectory(directoryPath);
-			}
-
 			try
 			{
-				using (var zip = ZipFile.OpenRead(srcPath))
+				using (var zip = ZipFile.OpenRead(path))
 				{
+					var directoryPath = Path.Combine(Directory.GetCurrentDirectory(), "Files");
+
+					if (!Directory.Exists(directoryPath))
+					{
+						Directory.CreateDirectory(directoryPath);
+					}
+
 					foreach (var entry in zip.Entries)
 					{
 						Guid localFileName = Guid.NewGuid();
-						string filePath = $"{directoryPath}\\{localFileName.ToString()}" + Path.GetExtension(entry.FullName);
+						string filePath = Path.Combine(directoryPath, localFileName.ToString() + Path.GetExtension(entry.FullName));
 
 						model.Add(new FileModel
 						{
@@ -400,7 +424,36 @@ namespace JsNetCore.Models
 					result.Data = model;
 				}
 			}
-			catch(Exception ex)
+			catch (Exception ex)
+			{
+				result.Message = ex.Message;
+				result.Success = false;
+			}
+
+			return result;
+		}
+		#endregion
+
+		public MethodResult UploadFile(string base64File, string fileName)
+		{
+			var result = new MethodResult();
+			string filePath = string.Empty;
+
+			try
+			{
+				string directoryPath = Path.Combine(Directory.GetCurrentDirectory(), "Files");
+				filePath = Path.Combine(directoryPath, fileName);
+
+				if (!Directory.Exists(directoryPath))
+					Directory.CreateDirectory(directoryPath);
+
+				byte[] file = Convert.FromBase64String(base64File);
+				File.WriteAllBytes(filePath, file);
+
+				result.Data = filePath;
+				result.Success = true;
+			}
+			catch (Exception ex)
 			{
 				result.Message = ex.Message;
 				result.Success = false;
