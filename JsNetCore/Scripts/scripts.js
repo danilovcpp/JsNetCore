@@ -207,7 +207,7 @@ function showtrackinfobydevice(params) {
 }
 
 //--------------------------------------------------------------------------------
-function uploadaudiobookfile(params) {
+function uploadaudiofile(params) {
 
 	var audiofileinfo = null;
 	var path = fileModel.upload(params.content, params.recname);
